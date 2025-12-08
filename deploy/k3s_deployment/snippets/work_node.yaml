@@ -1,0 +1,25 @@
+#cloud-config
+users:
+  - name: bisheng
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+chpasswd:
+  list: |
+    bisheng:password
+  expire: false
+ssh_pwauth: true
+
+package_update: true
+package_upgrade: true
+packages:
+  - curl
+  - qemu-guest-agent
+  - nfs-server
+
+runcmd:
+  - systemctl enable --now qemu-guest-agent
+  - |
+    export MANAGER_IP="192.168.10.100" 
+    wget http://${MANAGER_IP}:8080/init.sh
+    chmod +x init.sh
+    bash init.sh work_node

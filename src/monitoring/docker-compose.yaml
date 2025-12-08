@@ -38,7 +38,7 @@ services:
     volumes:
       - ./pusher/prometheus_pusher.py:/app/prometheus_pusher.py 
     environment:
-      PVE_AGENT_ALERT_URL: "http://agent:9999/chat"
+      PVE_AGENT_ALERT_URL: "http://{{AGENT_HOST}}:9999/chat"
     networks:
       - monitor-net
 
@@ -52,8 +52,8 @@ services:
     ports:
       - "9999:9999"
     environment:
-      DEEPSEEK_API_KEY: "sk-a1eaa49800d74fb1b9276b0e8e0155b0"
-      MCP_URL: "http://192.168.10.100:8000/mcp"
+      DEEPSEEK_API_KEY: "DEEPSEEK_API_KEY_VALUE"
+      MCP_URL: "http://{{MCP_HOST}}:8000/mcp"
     networks:
       - monitor-net  
 

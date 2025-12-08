@@ -23,9 +23,9 @@ receivers:
   - name: 'default-receiver'
   - name: 'test-receiver'
     webhook_configs:
-    - url: 'http://192.168.10.100:9095/webhook/alertmanager'
+    - url: 'http://{{PUSHER_HOST}}:9095/webhook/alertmanager'
       send_resolved: true
   - name: 'pve-agent-receiver'
     webhook_configs:
-    - url: 'http://192.168.10.100:9095/webhook/alertmanager'
+    - url: 'http://{{PUSHER_HOST}}:9095/webhook/alertmanager'
       send_resolved: true

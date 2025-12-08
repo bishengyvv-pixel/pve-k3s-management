@@ -1,0 +1,8 @@
+services:
+  registry:
+    image: registry:latest
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - /pve-k3s-management/deploy/registeries/docker/registry/v2:/var/lib/registry

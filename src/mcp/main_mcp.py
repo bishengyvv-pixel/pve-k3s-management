@@ -643,4 +643,4 @@ if __name__ == "__main__":
         print(f"ERROR: MCP_PORT environment variable is not a valid integer: {MCP_PORT}. Using default port 8000.")
         mcp_port_int = 8000
     
-    mcp.run(transport="streamable-http",host=MCP_HOST, port=mcp_port_int)
+    mcp.run(transport="streamable-http", host=MCP_HOST, port=mcp_port_int)
