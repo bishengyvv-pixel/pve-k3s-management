@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY prometheus_pusher.py .
+
+EXPOSE 9095
+
+CMD ["uvicorn", "prometheus_pusher:app", "--host", "0.0.0.0", "--port", "9095"]

@@ -1,0 +1,22 @@
+groups:
+- name: k3s-node-alerts
+  rules:
+  - alert: HighCPULoad
+    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 60
+    for: 1m
+    labels:
+      severity: warning
+      owner: infrastructure
+    annotations:
+      summary: "节点 CPU 负载过高 (大于 80%)"
+      description: "节点 {{ $labels.instance }} 的平均 CPU 使用率在过去 5 分钟内超过 80% (当前值: {{ $value }}%)"
+
+  - alert: TEST_IMMEDIATE_CPU_LOAD
+    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[30s])) * 100) > 90
+    for: 0s 
+    labels:
+      severity: test
+      owner: test-user
+    annotations:
+      summary: "【立即触发测试】CPU 负载超高 ( > 90%)"
+      description: "节点 {{ $labels.instance }} 的 CPU 瞬时负载已在 30 秒窗口内超过 90% (当前值: {{ $value }}%)"

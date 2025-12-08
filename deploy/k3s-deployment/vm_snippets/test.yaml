@@ -1,0 +1,25 @@
+#cloud-config
+users:
+  - name: bisheng
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    shell: /bin/bash
+chpasswd:
+  list: |
+    bisheng:password
+  expire: false
+ssh_pwauth: true
+
+apt:
+  primary:
+    - arches: [default] 
+      uri: https://mirrors.tuna.tsinghua.edu.cn/ubuntu/
+
+package_update: true
+package_upgrade: true
+packages:
+  - containerd
+  - apt-transport-https
+  - curl
+  - qemu-guest-agent
+runcmd:
+  - systemctl enable --now qemu-guest-agent
