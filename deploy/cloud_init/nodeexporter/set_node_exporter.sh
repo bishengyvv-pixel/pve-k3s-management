@@ -8,7 +8,7 @@ set -e
 
 # --- 全局常量定义 ---
 YAML_FILENAME="node_exporter.yaml"
-DOWNLOAD_URL="http://${MANAGER_IP}:8080/node_exporter_set/${YAML_FILENAME}"
+DOWNLOAD_URL="http://${MANAGER_IP}:8080/nodeexporter/${YAML_FILENAME}"
 NAMESPACE="kube-system"
 TIMEOUT_SECONDS=120
 

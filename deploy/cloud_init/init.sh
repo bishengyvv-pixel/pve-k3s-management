@@ -10,7 +10,7 @@ SCRIPT_NAME=$(basename "$0")
 # NFS_SERVER NFS 服务器的 IP 地址
 NFS_SERVER=${MANAGER_IP}
 # NFS_EXPORT NFS 服务器导出的路径
-NFS_EXPORT="/pve-k3s-management/k3s_deployment/k3s_scripts"
+NFS_EXPORT="/pve-k3s-management/deploy/k3s_deployment/k3s_scripts"
 # MOUNT_POINT 本地用于挂载 NFS 的目录
 MOUNT_POINT="/mnt/nfs"
 # APT_SOURCE_LIST 新的 apt 源配置内容

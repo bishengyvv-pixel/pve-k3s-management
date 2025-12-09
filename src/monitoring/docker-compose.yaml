@@ -1,4 +1,18 @@
 services:
+  pve-mcp:
+    build:
+      context: ../mcp
+      dockerfile: Dockerfile
+    image: pve-mcp:latest
+    container_name: pve-management-agent
+    ports:
+      - 8000:8000
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - monitor-net
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -7,10 +21,13 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus/token:/etc/prometheus/token
       - ./prometheus/rule.yml:/etc/prometheus/rule.yml
+    secrets:
+      - prometheus_token
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - monitor-net
 
   alertmanager:
     image: prom/alertmanager:latest
@@ -38,7 +55,7 @@ services:
     volumes:
       - ./pusher/prometheus_pusher.py:/app/prometheus_pusher.py 
     environment:
-      PVE_AGENT_ALERT_URL: "http://{{AGENT_HOST}}:9999/chat"
+      PVE_AGENT_ALERT_URL: "http://agent:9999/chat"
     networks:
       - monitor-net
 
@@ -51,12 +68,17 @@ services:
     restart: unless-stopped
     ports:
       - "9999:9999"
+    env_file:
+      - .env
     environment:
-      DEEPSEEK_API_KEY: "DEEPSEEK_API_KEY_VALUE"
-      MCP_URL: "http://{{MCP_HOST}}:8000/mcp"
+      MCP_URL: "http://pve-mcp:8000/mcp"
     networks:
       - monitor-net  
 
 networks:
   monitor-net:
     driver: bridge
+
+secrets:
+  prometheus_token:
+    file: ./prometheus/token

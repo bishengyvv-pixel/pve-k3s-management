@@ -23,9 +23,9 @@ receivers:
   - name: 'default-receiver'
   - name: 'test-receiver'
     webhook_configs:
-    - url: 'http://{{PUSHER_HOST}}:9095/webhook/alertmanager'
+    - url: 'http://prometheus_pusher:9095/webhook/alertmanager'
       send_resolved: true
   - name: 'pve-agent-receiver'
     webhook_configs:
-    - url: 'http://{{PUSHER_HOST}}:9095/webhook/alertmanager'
+    - url: 'http://prometheus_pusher:9095/webhook/alertmanager'
       send_resolved: true

@@ -19,7 +19,8 @@ export MANAGER_IP = {{your_manager_ip}}
 # 脚本配置说明
 ## snippets
 ### control/work
-- 在runcmd块中定义的MANAGER_IP
+- user-data文件
+- 需要在runcmd块中定义的MANAGER_IP
 
 ### test
 - 该脚本仅用于测试
