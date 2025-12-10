@@ -72,6 +72,7 @@ services:
       - .env
     environment:
       MCP_URL: "http://pve-mcp:8000/mcp"
+      PYTHONUNBUFFERED: 1
     networks:
       - monitor-net  
 
