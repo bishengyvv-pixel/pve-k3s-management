@@ -5,4 +5,4 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - /pve-k3s-management/deploy/registeries/docker/registry/v2:/var/lib/registry
+      - /pve-k3s-management/deploy/registeries:/var/lib/registry
