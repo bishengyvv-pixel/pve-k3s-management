@@ -9,12 +9,12 @@ import os
 import time
 import json
 from contextlib import asynccontextmanager
-
-# --- 新增 Web 服务相关导入 ---
 from fastapi import FastAPI, Body
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from typing import Generator, List, Dict, Any, Optional
+
 
 # --- 全局变量 ---
 agent_instance = None
@@ -112,13 +112,12 @@ def SetAgent(model: str, tools: list, response_format: type, checkpointer: InMem
     )
     return agent
 
-
 async def sse_generator(agent, msg: str, thread_id: int):
     """
     将 LangGraph 的输出转换为 SSE (Server-Sent Events) 格式流。
     """
     print(f"--- 收到请求: {msg} (Thread: {thread_id}) ---")
-    
+
     # 1. 发送开始信号
     yield f"event: start\ndata: 开始处理...\n\n"
 
@@ -135,23 +134,23 @@ async def sse_generator(agent, msg: str, thread_id: int):
                             # 构造 JSON 数据
                             payload = json.dumps({"type": "thought", "content": message.content}, ensure_ascii=False)
                             yield f"data: {payload}\n\n"
-                
+
                 # 3. 处理工具调用
                 if "tool_calls" in update:
                     for call in update["tool_calls"]:
                         payload = json.dumps({"type": "tool_call", "name": call['name'], "args": call['args']}, ensure_ascii=False)
                         yield f"data: {payload}\n\n"
-                
+
                 # 4. 处理最终结构化响应
                 if "structured_response" in update:
                     answer = update["structured_response"].Answer
                     payload = json.dumps({"type": "answer", "content": answer}, ensure_ascii=False)
                     yield f"event: result\ndata: {payload}\n\n"
-                    
+
     except Exception as e:
         error_msg = json.dumps({"type": "error", "content": str(e)}, ensure_ascii=False)
         yield f"event: error\ndata: {error_msg}\n\n"
-    
+
     # 5. 发送结束信号
     yield "event: done\ndata: [DONE]\n\n"
 
