@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -76,9 +77,11 @@
             overflow-x: auto;
             font-size: 0.9em;
         }
+
         .agent-message code {
             font-family: monospace;
         }
+
         .agent-message p {
             margin-top: 0.5em;
             margin-bottom: 0.5em;
@@ -119,7 +122,7 @@
             background-color: #9fa8da;
             cursor: not-allowed;
         }
-        
+
         /* 状态指示器样式 */
         .status-badge {
             display: inline-block;
@@ -144,15 +147,105 @@
             background-color: #ffebee;
             color: #f44336;
         }
+
+        /* 分析过程容器 */
+        .analysis-process {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+
+        .analysis-header {
+            padding: 10px 15px;
+            background-color: #e9ecef;
+            color: #495057;
+            font-size: 0.9em;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+
+        .analysis-header:hover {
+            background-color: #dee2e6;
+        }
+
+        .analysis-content {
+            padding: 10px 15px;
+            display: block;
+            /* 默认展开 */
+        }
+
+        .analysis-content.collapsed {
+            display: none;
+        }
+
+        .analysis-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+
+        .analysis-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .analysis-label {
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .label-thought {
+            background-color: #fff3e0;
+            color: #e65100;
+        }
+
+        .label-tool-call {
+            background-color: #e3f2fd;
+            color: #0d47a1;
+        }
+
+        .label-tool-result {
+            background-color: #e8f5e9;
+            color: #1b5e20;
+        }
+
+        .analysis-text {
+            font-size: 0.9em;
+            color: #333;
+            white-space: pre-wrap;
+        }
+
+        .analysis-text pre {
+            margin: 5px 0;
+            background-color: #fff;
+            border: 1px solid #eee;
+        }
+
+        .final-answer {
+            margin-top: 10px;
+        }
     </style>
     <!-- 引入 marked.js CDN 以支持 Markdown 渲染 -->
     <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 </head>
+
 <body>
 
     <div class="chat-container">
         <div class="header">PVE Agent</div>
-        
+
         <div class="messages" id="messages">
             <div class="message-box agent-message">
                 你好！我是一个 Proxmox VE (PVE) 虚拟机管理专家。请输入你的任务，例如：`请在 pve-1 节点上创建一个 k3s 控制节点，IP 地址为 192.168.10.50`
@@ -167,7 +260,7 @@
 
     <script>
         // JavaScript 逻辑
-        const API_URL = "http://192.168.10.200:9999/chat"; // 确保与后端配置一致
+        const API_URL = "http://192.168.116.100:9999/chat"; // 确保与后端配置一致
         const messagesDiv = document.getElementById('messages');
         const userInput = document.getElementById('userInput');
         const sendButton = document.getElementById('sendButton');
@@ -194,17 +287,61 @@
 
         /**
          * 创建一个 Agent 消息容器并返回其内容元素
-         * @returns {HTMLElement} - 用于填充内容的元素
+         * @returns {Object} - { analysisContainer, finalAnswerContainer }
          */
         function createAgentMessage() {
             const msgBox = document.createElement('div');
             msgBox.className = 'message-box agent-message';
-            // 创建一个内部 div 来容纳内容，这样我们可以轻松替换它而不影响徽章
-            const content = document.createElement('div');
-            msgBox.appendChild(content);
+
+            // 1. 分析过程区域
+            const analysisProcess = document.createElement('div');
+            analysisProcess.className = 'analysis-process';
+
+            const analysisHeader = document.createElement('div');
+            analysisHeader.className = 'analysis-header';
+            analysisHeader.innerHTML = '<span>🤖 AI 分析过程</span><span>▼</span>';
+            analysisHeader.onclick = () => {
+                analysisContent.classList.toggle('collapsed');
+                analysisHeader.querySelector('span:last-child').innerText = analysisContent.classList.contains('collapsed') ? '▶' : '▼';
+            };
+
+            const analysisContent = document.createElement('div');
+            analysisContent.className = 'analysis-content'; // 默认展开
+
+            analysisProcess.appendChild(analysisHeader);
+            analysisProcess.appendChild(analysisContent);
+            msgBox.appendChild(analysisProcess);
+
+            // 2. 最终答案区域
+            const finalAnswer = document.createElement('div');
+            finalAnswer.className = 'final-answer';
+            msgBox.appendChild(finalAnswer);
+
             messagesDiv.appendChild(msgBox);
             scrollToBottom();
-            return content;
+
+            return { analysisContainer: analysisContent, finalAnswerContainer: finalAnswer };
+        }
+
+        /**
+         * 添加分析条目
+         */
+        function addAnalysisItem(container, type, content, title = '') {
+            const item = document.createElement('div');
+            item.className = 'analysis-item';
+
+            const label = document.createElement('span');
+            label.className = `analysis-label label-${type.replace('_', '-')}`;
+            label.innerText = title || type;
+
+            const text = document.createElement('div');
+            text.className = 'analysis-text';
+            text.innerHTML = marked.parse(content);
+
+            item.appendChild(label);
+            item.appendChild(text);
+            container.appendChild(item);
+            scrollToBottom();
         }
 
         /**
@@ -239,15 +376,11 @@
             userInput.value = '';
             sendButton.disabled = true;
             isStreaming = true;
-            
-            // 为 Agent 响应创建一个新的容器 (currentContentElement 是内容填充区域)
-            // 必须使用 .parentElement 来获取最外层的 .message-box 容器
-            const currentContentElement = createAgentMessage();
-            const agentResponseContainer = currentContentElement.parentElement;
 
+            // 为 Agent 响应创建一个新的容器
+            const { analysisContainer, finalAnswerContainer } = createAgentMessage();
+            const agentResponseContainer = finalAnswerContainer.parentElement;
 
-            let thoughtBadge = null;
-            let toolCallBadge = null;
             let finalAnswerReceived = false;
 
             try {
@@ -261,7 +394,7 @@
                 if (!response.ok) {
                     throw new Error(`HTTP 错误: ${response.status}`);
                 }
-                
+
                 // 3. 读取流
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
@@ -272,7 +405,7 @@
                     if (done) break;
 
                     buffer += decoder.decode(value, { stream: true });
-                    
+
                     // SSE 解析
                     let lines = buffer.split('\n');
                     buffer = lines.pop(); // 保留最后一行不完整的行
@@ -290,48 +423,37 @@
                                 }
 
                                 const payload = JSON.parse(dataStr);
-                                
+
                                 switch (payload.type) {
                                     case 'thought':
-                                        // 显示思考过程
-                                        if (thoughtBadge) thoughtBadge.remove(); // 移除旧徽章
-                                        if (toolCallBadge) toolCallBadge.remove(); // 移除工具徽章
-                                        
-                                        thoughtBadge = addStatusBadge(agentResponseContainer, 'thought', '🤖 思考中...');
-                                        
-                                        // 使用 marked.parse 渲染思考内容
-                                        currentContentElement.innerHTML = marked.parse(`**思考:** ${payload.content}`);
+                                        // 过滤掉最终的结构化响应原始文本
+                                        if (payload.content.startsWith("Returning structured response")) {
+                                            break;
+                                        }
+                                        addAnalysisItem(analysisContainer, 'thought', payload.content, '思考');
                                         break;
 
                                     case 'tool_call':
-                                        // 显示工具调用
-                                        if (thoughtBadge) thoughtBadge.remove();
-                                        if (toolCallBadge) toolCallBadge.remove();
+                                        const toolCallMarkdown = `\`${payload.name}\`\n\`\`\`json\n${JSON.stringify(payload.args, null, 2)}\n\`\`\``;
+                                        addAnalysisItem(analysisContainer, 'tool_call', toolCallMarkdown, `调用工具: ${payload.name}`);
+                                        break;
 
-                                        toolCallBadge = addStatusBadge(agentResponseContainer, 'tool', `🛠️ 调用 ${payload.name}`);
-                                        
-                                        // 格式化工具调用内容，使用 Markdown 渲染代码块
-                                        const toolCallMarkdown = `**工具调用:** \`${payload.name}\`\n\n\`\`\`json\n${JSON.stringify(payload.args, null, 2)}\n\`\`\``;
-                                        currentContentElement.innerHTML = marked.parse(toolCallMarkdown);
+                                    case 'tool_result':
+                                        const toolResultMarkdown = `\`${payload.name}\`\n\`\`\`json\n${payload.content}\n\`\`\``;
+                                        addAnalysisItem(analysisContainer, 'tool_result', toolResultMarkdown, `工具结果: ${payload.name}`);
                                         break;
 
                                     case 'answer':
                                         // 最终答案
-                                        if (thoughtBadge) thoughtBadge.remove();
-                                        if (toolCallBadge) toolCallBadge.remove();
-                                        
-                                        // 使用 marked.parse 渲染最终答案
-                                        currentContentElement.innerHTML = marked.parse(payload.content);
+                                        finalAnswerContainer.innerHTML = marked.parse(payload.content);
                                         finalAnswerReceived = true;
                                         break;
-                                        
+
                                     case 'error':
-                                        if (thoughtBadge) thoughtBadge.remove();
-                                        if (toolCallBadge) toolCallBadge.remove();
                                         addStatusBadge(agentResponseContainer, 'error', '❌ 错误');
-                                        currentContentElement.innerText = `[错误]: ${payload.content}`;
+                                        finalAnswerContainer.innerText = `[错误]: ${payload.content}`;
                                         break;
-                                        
+
                                     // 忽略 event: start
                                     default:
                                         // 忽略其他未知类型
@@ -341,9 +463,6 @@
                                 scrollToBottom();
                             } catch (e) {
                                 console.error("Error parsing data line:", line, e);
-                                // IMPORTANT: 移除将解析错误信息打印到聊天界面的逻辑，只在控制台记录。
-                                // currentContentElement.innerText = currentContentElement.innerText + `\n[解析错误]: ${e.message}`; 
-                                // 此处不再做任何 UI 更改，避免干扰正常的聊天内容。
                             }
                         }
                     }
@@ -353,25 +472,23 @@
                 console.error("Stream failed:", error);
                 if (!finalAnswerReceived) {
                     addStatusBadge(agentResponseContainer, 'error', '❌ 连接失败');
-                    currentContentElement.innerHTML = `与 Agent 的连接中断或发生错误: ${error.message}`;
+                    finalAnswerContainer.innerHTML = `与 Agent 的连接中断或发生错误: ${error.message}`;
                 }
             } finally {
                 // 4. UI 恢复
                 isStreaming = false;
                 sendButton.disabled = false;
                 userInput.focus();
-                // 移除所有剩余的状态徽章
-                if (thoughtBadge) thoughtBadge.remove();
-                if (toolCallBadge) toolCallBadge.remove();
             }
         }
 
         // 绑定回车键发送
-        userInput.addEventListener('keypress', function(e) {
+        userInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter' && !isStreaming) {
                 sendMessage();
             }
         });
     </script>
 </body>
+
 </html>

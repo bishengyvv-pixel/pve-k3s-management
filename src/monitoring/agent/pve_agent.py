@@ -127,12 +127,28 @@ async def sse_generator(agent, msg: str, thread_id: int):
             {"configurable": {"thread_id": thread_id}},
         ):
             for update in step.values():
+                
                 # 2. 处理消息 (思考过程)
                 if "messages" in update:
                     for message in update["messages"]:
-                        if message.content:
+                        # 处理思考过程 (AIMessage)
+                        if isinstance(message, AIMessage) and message.content:
+                            # 过滤掉最终的结构化响应原始文本
+                            if message.content.startswith("Returning structured response"):
+                                continue
+
                             # 构造 JSON 数据
                             payload = json.dumps({"type": "thought", "content": message.content}, ensure_ascii=False)
+                            yield f"data: {payload}\n\n"
+
+                        # 处理工具执行结果 (ToolMessage)
+                        elif isinstance(message, ToolMessage):
+                            payload = json.dumps({
+                                "type": "tool_result",
+                                "name": message.name,
+                                "content": message.content,
+                                "tool_call_id": message.tool_call_id
+                            }, ensure_ascii=False)
                             yield f"data: {payload}\n\n"
 
                 # 3. 处理工具调用
