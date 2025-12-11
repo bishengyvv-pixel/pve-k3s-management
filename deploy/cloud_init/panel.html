@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYSTEM_MONITOR // GRID_VIEW</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="config.js"></script>
+    <style>
+        :root {
+            --bg-color: #020617;
+            --primary-color: #00f3ff;
+            --secondary-color: #bc13fe;
+            --alert-color: #ff2a6d;
+            --text-color: #e2e8f0;
+            --grid-color: rgba(0, 243, 255, 0.05);
+            --card-bg: rgba(15, 23, 42, 0.8);
+            --card-border: rgba(0, 243, 255, 0.3);
+        }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--bg-color);
+            background-image:
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: var(--text-color);
+            min-height: 100vh;
+            text-transform: uppercase;
+        }
+
+        /* 扫描线效果 */
+        body::after {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid var(--primary-color);
+            background: rgba(0, 243, 255, 0.05);
+            backdrop-filter: blur(5px);
+            position: relative;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        }
+
+        .header h1 {
+            font-size: 2em;
+            color: var(--primary-color);
+            margin: 0;
+            text-shadow: 0 0 10px var(--primary-color);
+            letter-spacing: 4px;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .refresh-info {
+            font-size: 0.9em;
+            color: var(--secondary-color);
+            text-shadow: 0 0 5px var(--secondary-color);
+        }
+
+        /* REFRESH CONTROL */
+        .refresh-control {
+            display: flex;
+            align-items: center;
+            font-size: 0.9em;
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            padding: 5px 10px;
+            background: rgba(0, 243, 255, 0.1);
+            position: relative;
+        }
+
+        .refresh-control label {
+            margin-right: 10px;
+        }
+
+        .refresh-control select {
+            background: transparent;
+            color: #fff;
+            border: none;
+            font-family: inherit;
+            font-size: inherit;
+            outline: none;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .refresh-control select option {
+            background-color: #020617;
+            color: var(--primary-color);
+        }
+
+        /* GRID LAYOUT */
+        #node-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            /* 响应式网格 */
+            gap: 25px;
+            padding-bottom: 50px;
+        }
+
+        /* CARD COMPONENT */
+        .node-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 20px;
+            position: relative;
+            transition: all 0.4s ease;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: card-enter 0.5s forwards;
+            overflow: hidden;
+        }
+
+        @keyframes card-enter {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .node-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.2);
+            border-color: var(--primary-color);
+            z-index: 10;
+        }
+
+        /* 装饰性边角 */
+        .node-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 15px;
+            height: 15px;
+            border-top: 2px solid var(--primary-color);
+            border-left: 2px solid var(--primary-color);
+            transition: all 0.3s;
+        }
+
+        .node-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 15px;
+            height: 15px;
+            border-bottom: 2px solid var(--primary-color);
+            border-right: 2px solid var(--primary-color);
+            transition: all 0.3s;
+        }
+
+        .node-card:hover::before,
+        .node-card:hover::after {
+            width: 100%;
+            height: 100%;
+            opacity: 0.1;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px dashed rgba(0, 243, 255, 0.3);
+            padding-bottom: 10px;
+        }
+
+        .instance-name {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            font-size: 0.8em;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 2px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid currentColor;
+        }
+
+        .status-up {
+            color: #00ff9d;
+            box-shadow: 0 0 8px #00ff9d40;
+        }
+
+        .status-down {
+            color: var(--alert-color);
+            box-shadow: 0 0 8px #ff2a6d40;
+        }
+
+        .metrics-container {
+            margin-bottom: 20px;
+        }
+
+        .metric-row {
+            margin-bottom: 15px;
+            cursor: pointer;
+            /* Clickable */
+            padding: 10px;
+            border: 1px solid transparent;
+            transition: all 0.3s;
+            border-radius: 4px;
+            position: relative;
+            z-index: 100;
+        }
+
+        .metric-row:hover {
+            background: rgba(0, 243, 255, 0.15);
+            border-color: rgba(0, 243, 255, 0.5);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+        }
+
+        .metric-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9em;
+            color: var(--text-color);
+            margin-bottom: 5px;
+            pointer-events: none;
+        }
+
+        .metric-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            text-shadow: 0 0 5px currentColor;
+        }
+
+        .progress-track {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            position: relative;
+            clip-path: polygon(0 0, 100% 0, 98% 100%, 0% 100%);
+            pointer-events: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0;
+            transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+            position: relative;
+        }
+
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            /* Align to the end */
+            bottom: 0;
+            width: 4px;
+            /* Tip width */
+            background: #fff;
+            box-shadow: 0 0 15px #fff;
+            animation: blink-glow 0.8s infinite alternate;
+            /* Breathing/Blinking effect */
+            pointer-events: none;
+        }
+
+        @keyframes blink-glow {
+            0% {
+                opacity: 0.2;
+                box-shadow: 0 0 5px #fff;
+            }
+
+            100% {
+                opacity: 1;
+                box-shadow: 0 0 20px #fff, 0 0 10px var(--primary-color);
+            }
+        }
+
+        /* CHART MODAL */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-window {
+            width: 800px;
+            max-width: 90%;
+            background: #0b1120;
+            border: 1px solid var(--primary-color);
+            box-shadow: 0 0 50px rgba(0, 243, 255, 0.2);
+            padding: 20px;
+            position: relative;
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+
+        .modal-overlay.active .modal-window {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px dashed var(--primary-color);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 1.5em;
+            color: var(--primary-color);
+            text-shadow: 0 0 10px var(--primary-color);
+        }
+
+        .modal-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .time-btn {
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 5px 15px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .time-btn:hover,
+        .time-btn.active {
+            background: var(--primary-color);
+            color: #000;
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        .close-btn {
+            background: transparent;
+            border: none;
+            color: var(--alert-color);
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+
+        /* TAGS */
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 0.75em;
+        }
+
+        .tag {
+            background: rgba(188, 19, 254, 0.1);
+            border: 1px solid rgba(188, 19, 254, 0.4);
+            color: var(--secondary-color);
+            padding: 3px 8px;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .tag:hover {
+            background: rgba(188, 19, 254, 0.3);
+            box-shadow: 0 0 10px rgba(188, 19, 254, 0.4);
+        }
+
+        .loading,
+        .error {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.5em;
+            grid-column: 1 / -1;
+            color: var(--primary-color);
+            text-shadow: 0 0 10px var(--primary-color);
+        }
+
+        .error {
+            color: var(--alert-color);
+            text-shadow: 0 0 10px var(--alert-color);
+        }
+
+        #last-updated {
+            color: #fff;
+        }
+
+        .updating {
+            color: var(--primary-color) !important;
+            text-shadow: 0 0 15px var(--primary-color);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>SYSTEM_MONITOR // GRID_VIEW</h1>
+            <div class="header-controls">
+                <div class="refresh-control">
+                    <label for="refresh-select">REFRESH_RATE:</label>
+                    <select id="refresh-select">
+                        <option value="1000">1s [TURBO]</option>
+                        <option value="5000">5s [NORMAL]</option>
+                        <option value="10000">10s [SLOW]</option>
+                        <option value="30000">30s [ECO]</option>
+                        <option value="0">PAUSE</option>
+                    </select>
+                </div>
+                <div class="refresh-info">
+                    SYNC_TIME: <span id="last-updated">--:--:--</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="node-grid">
+            <div class="loading">INITIALIZING NEURAL LINK...</div>
+        </div>
+    </div>
+
+    <!-- DETAIL MODAL -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal-window">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title" id="modal-title">INSTANCE_ID // METRIC</div>
+                </div>
+                <div class="modal-controls">
+                    <button class="time-btn" onclick="switchTimeRange(1)">1M</button>
+                    <button class="time-btn active" onclick="switchTimeRange(5)">5M</button>
+                    <button class="time-btn" onclick="switchTimeRange(30)">30M</button>
+                    <button class="close-btn" onclick="closeModal()">×</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="metricChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const QUERIES = {
+            up: 'up',
+            cpu: '100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)',
+            memory: '(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100'
+        };
+
+        const gridDiv = document.getElementById('node-grid');
+        const lastUpdatedSpan = document.getElementById('last-updated');
+        const refreshSelect = document.getElementById('refresh-select');
+        const modal = document.getElementById('detail-modal');
+        const modalTitle = document.getElementById('modal-title');
+
+        let chartInstance = null;
+        let currentInstance = '';
+        let currentMetric = '';
+        let currentTimeRange = 5; // Default 5m
+
+        let isFirstLoad = true;
+        let refreshIntervalId = null;
+
+        async function fetchMetric(query) {
+            const url = `${PROMETHEUS_BASE_URL}/query?query=${encodeURIComponent(query)}&_=${Date.now()}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            if (json.status !== 'success') throw new Error(json.error || 'Query failed');
+            return json.data.result;
+        }
+
+        async function fetchAllData() {
+            try {
+                lastUpdatedSpan.classList.add('updating');
+
+                const [upRes, cpuRes, memRes] = await Promise.all([
+                    fetchMetric(QUERIES.up),
+                    fetchMetric(QUERIES.cpu),
+                    fetchMetric(QUERIES.memory)
+                ]);
+
+                const dataMap = new Map();
+
+                // 合并数据
+                upRes.forEach(item => {
+                    const instance = item.metric.instance;
+                    if (!instance) return;
+                    dataMap.set(instance, {
+                        instance: instance,
+                        job: item.metric.job,
+                        up: item.value[1] === '1',
+                        cpu: 0,
+                        mem: 0,
+                        labels: item.metric
+                    });
+                });
+
+                cpuRes.forEach(item => {
+                    const instance = item.metric.instance;
+                    if (dataMap.has(instance)) dataMap.get(instance).cpu = parseFloat(item.value[1]);
+                });
+
+                memRes.forEach(item => {
+                    const instance = item.metric.instance;
+                    if (dataMap.has(instance)) dataMap.get(instance).mem = parseFloat(item.value[1]);
+                });
+
+                renderGrid(Array.from(dataMap.values()));
+                updateTimestamp();
+
+                // Real-time Chart Update
+                if (modal.classList.contains('active')) {
+                    renderChart();
+                }
+
+                setTimeout(() => lastUpdatedSpan.classList.remove('updating'), 800);
+
+            } catch (error) {
+                console.error('Fetch error:', error);
+                if (isFirstLoad) {
+                    renderError(error.message);
+                } else {
+                    lastUpdatedSpan.innerHTML = "<span style='color:var(--alert-color)'>SYNC_FAILED</span>";
+                }
+            }
+        }
+
+        function getColor(percentage) {
+            if (percentage < 60) return '#00ff9d'; // Neon Green
+            if (percentage < 80) return '#ffaa00'; // Neon Orange
+            return '#ff2a6d'; // Neon Red
+        }
+
+        function renderGrid(data) {
+            data.sort((a, b) => a.instance.localeCompare(b.instance));
+
+            if (isFirstLoad) {
+                gridDiv.innerHTML = ''; // 清除 loading
+            }
+
+            data.forEach((node, index) => {
+                let card = document.getElementById(`node-${node.instance}`);
+
+                const isUp = node.up;
+                const statusClass = isUp ? 'status-up' : 'status-down';
+                const statusText = isUp ? 'ONLINE' : 'OFFLINE';
+
+                const cpuVal = node.cpu.toFixed(2);
+                const memVal = node.mem.toFixed(2);
+                const cpuColor = getColor(node.cpu);
+                const memColor = getColor(node.mem);
+
+                const otherLabels = Object.entries(node.labels)
+                    .filter(([key]) => !['instance', 'job', '__name__'].includes(key))
+                    .map(([key, val]) => `<div class="tag">${key}:${val}</div>`)
+                    .join('');
+
+                if (!card) {
+                    // Create New Card
+                    card = document.createElement('div');
+                    card.className = 'node-card';
+                    card.id = `node-${node.instance}`;
+                    // Staggered animation delay
+                    card.style.animationDelay = `${index * 0.1}s`;
+
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <div class="instance-name">${node.instance}</div>
+                            <div class="status-indicator ${statusClass}">
+                                ● ${statusText}
+                            </div>
+                        </div>
+                        
+                        <div class="metrics-container">
+                            <div class="metric-row cpu-row" onclick="openModal('${node.instance}', 'cpu')">
+                                <div class="metric-label">
+                                    <span>CPU_LOAD</span>
+                                    <span class="metric-value cpu-val" style="color:${cpuColor}">${cpuVal}%</span>
+                                </div>
+                                <div class="progress-track">
+                                    <div class="progress-fill cpu-bar" style="width:${cpuVal}%; background:${cpuColor}; box-shadow: 0 0 10px ${cpuColor}"></div>
+                                </div>
+                            </div>
+
+                            <div class="metric-row mem-row" onclick="openModal('${node.instance}', 'memory')">
+                                <div class="metric-label">
+                                    <span>MEM_USAGE</span>
+                                    <span class="metric-value mem-val" style="color:${memColor}">${memVal}%</span>
+                                </div>
+                                <div class="progress-track">
+                                    <div class="progress-fill mem-bar" style="width:${memVal}%; background:${memColor}; box-shadow: 0 0 10px ${memColor}"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tags-container">
+                            ${otherLabels}
+                        </div>
+                    `;
+                    gridDiv.appendChild(card);
+                } else {
+                    // Update Existing Card
+
+                    // Status
+                    const statusEl = card.querySelector('.status-indicator');
+                    if (!statusEl.classList.contains(statusClass)) {
+                        statusEl.className = `status-indicator ${statusClass}`;
+                        statusEl.innerHTML = `● ${statusText}`;
+                    }
+
+                    // CPU
+                    const cpuValEl = card.querySelector('.cpu-val');
+                    cpuValEl.innerText = `${cpuVal}%`;
+                    cpuValEl.style.color = cpuColor;
+
+                    const cpuBar = card.querySelector('.cpu-bar');
+                    cpuBar.style.width = `${cpuVal}%`;
+                    cpuBar.style.background = cpuColor;
+                    cpuBar.style.boxShadow = `0 0 10px ${cpuColor}`;
+                    const cpuRow = card.querySelector('.cpu-row');
+                    if (cpuRow) cpuRow.setAttribute('onclick', `openModal('${node.instance}', 'cpu')`);
+
+                    // MEM
+                    const memValEl = card.querySelector('.mem-val');
+                    memValEl.innerText = `${memVal}%`;
+                    memValEl.style.color = memColor;
+
+                    const memBar = card.querySelector('.mem-bar');
+                    memBar.style.width = `${memVal}%`;
+                    memBar.style.background = memColor;
+                    memBar.style.boxShadow = `0 0 10px ${memColor}`;
+                    const memRow = card.querySelector('.mem-row');
+                    if (memRow) memRow.setAttribute('onclick', `openModal('${node.instance}', 'memory')`);
+                }
+            });
+
+            isFirstLoad = false;
+        }
+
+        function renderError(message) {
+            let errorMsg = message;
+            if (message.includes('Failed to fetch')) {
+                errorMsg = `SYSTEM FAILURE: CANNOT CONNECT TO PROMETHEUS HOST`;
+            }
+            gridDiv.innerHTML = `<div class="error">WARNING: ${errorMsg}</div>`;
+        }
+
+        function updateTimestamp() {
+            const now = new Date();
+            lastUpdatedSpan.innerText = now.toLocaleTimeString('en-US', { hour12: false });
+        }
+
+        // --- Auto Refresh Logic ---
+
+        function startAutoRefresh(interval) {
+            if (refreshIntervalId) {
+                clearInterval(refreshIntervalId);
+                refreshIntervalId = null;
+            }
+            if (interval > 0) {
+                refreshIntervalId = setInterval(fetchAllData, interval);
+            }
+        }
+
+        refreshSelect.addEventListener('change', (e) => {
+            const newInterval = parseInt(e.target.value, 10);
+            startAutoRefresh(newInterval);
+        });
+
+        // --- Chart/Modal Logic ---
+
+        function openModal(instance, metric) {
+            currentInstance = instance;
+            currentMetric = metric;
+            modal.classList.add('active');
+            modalTitle.innerText = `${instance} // ${metric.toUpperCase()}_HISTORY`;
+
+            // Set default button state
+            document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector('.time-btn[onclick*="5"]').classList.add('active');
+            currentTimeRange = 5;
+
+            // Destroy existing chart on open to ensure clean state
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+
+            renderChart();
+        }
+
+        function closeModal() {
+            modal.classList.remove('active');
+            // We don't destroy chart here anymore to keep it cached, or we can destroy it if we want to save memory. 
+            // For cleaner re-opening, it's safer to destroy.
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+        }
+
+        function switchTimeRange(minutes) {
+            currentTimeRange = minutes;
+            document.querySelectorAll('.time-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Re-create chart for different range to reset scales cleanly? 
+            // Or just update. Let's try update first, but destroying might be safer for axis changes.
+            if (chartInstance) {
+                chartInstance.destroy();
+                chartInstance = null;
+            }
+            renderChart();
+        }
+
+        async function renderChart() {
+            // NOTE: We do NOT destroy chartInstance here if it exists, to support smooth updates
+
+            const ctx = document.getElementById('metricChart').getContext('2d');
+
+            const end = Date.now() / 1000;
+            const start = end - (currentTimeRange * 60);
+
+            // Adjust step based on range
+            let step = 2; // Default for 1m
+            if (currentTimeRange === 5) step = 10;
+            if (currentTimeRange === 30) step = 30;
+
+            let query = '';
+            // Use query_range directly
+            if (currentMetric === 'cpu') {
+                // Use irate for range query? irate over range is tricky. 
+                // Usually for graph we use rate() or just the value if it's a gauge.
+                // For CPU usage graph: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)
+                // Note: For query_range, we should probably stick to `rate` with a range window matching resolution or larger.
+                // Using 1m window for range query is standard.
+                query = `100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle", instance="${currentInstance}"}[1m])) * 100)`;
+            } else {
+                query = `(1 - (node_memory_MemAvailable_bytes{instance="${currentInstance}"} / node_memory_MemTotal_bytes{instance="${currentInstance}"})) * 100`;
+            }
+
+            try {
+                const url = `${PROMETHEUS_BASE_URL}/query_range?query=${encodeURIComponent(query)}&start=${start}&end=${end}&step=${step}&_=${Date.now()}`;
+                const res = await fetch(url);
+                const json = await res.json();
+
+                if (json.status !== 'success' || !json.data.result || json.data.result.length === 0) {
+                    console.warn('No data for chart');
+                    return;
+                }
+
+                const values = json.data.result[0].values;
+                const labels = values.map(v => {
+                    const date = new Date(v[0] * 1000);
+                    return date.toLocaleTimeString('en-US', { hour12: false });
+                });
+                const dataPoints = values.map(v => parseFloat(v[1]).toFixed(2));
+
+                // Construct Gradient (reuse if possible, but context dependent)
+                const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                gradient.addColorStop(0, 'rgba(0, 243, 255, 0.5)');
+                gradient.addColorStop(1, 'rgba(0, 243, 255, 0)');
+
+                const borderColor = '#00f3ff';
+
+                if (chartInstance) {
+                    // Update existing chart
+                    chartInstance.data.labels = labels;
+                    chartInstance.data.datasets[0].data = dataPoints;
+                    // Standard update to trigger configured animation
+                    chartInstance.update();
+                } else {
+                    // Create new chart
+                    chartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: `${currentMetric.toUpperCase()} %`,
+                                data: dataPoints,
+                                borderColor: borderColor,
+                                backgroundColor: gradient,
+                                borderWidth: 2,
+                                pointRadius: 0,
+                                pointHoverRadius: 4,
+                                fill: true,
+                                tension: 0.4 // Smooth curves
+                            }]
+                        },
+                        options: {
+                            animation: {
+                                duration: 800, // Smooth transition duration
+                                easing: 'easeOutQuart' // Natural smoothing
+                            },
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                            scales: {
+                                x: {
+                                    grid: { color: 'rgba(0, 243, 255, 0.1)' },
+                                    ticks: { color: '#e2e8f0', maxTicksLimit: 6 }
+                                },
+                                y: {
+                                    grid: { color: 'rgba(0, 243, 255, 0.1)' },
+                                    ticks: { color: '#00f3ff' },
+                                    min: 0,
+                                    max: 100
+                                }
+                            },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                    titleColor: '#00f3ff',
+                                    bodyColor: '#fff',
+                                    borderColor: '#00f3ff',
+                                    borderWidth: 1
+                                }
+                            }
+                        }
+                    });
+                }
+
+            } catch (err) {
+                console.error('Chart Load Error', err);
+            }
+        }
+
+        // 初始启动
+        fetchAllData();
+        startAutoRefresh(1000);
+
+    </script>
+</body>
+
+</html>

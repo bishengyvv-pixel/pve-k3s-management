@@ -1,2 +1,3 @@
 // 全局配置
-const BACKEND_BASE_URL = "http://{agent_ip}:9999";
+const AGENT_BASE_URL = "http://{AGENT_HOST}:9999";
+const PROMETHEUS_BASE_URL = 'http://{PROMETHEUS_HOST}:9090/api/v1';
