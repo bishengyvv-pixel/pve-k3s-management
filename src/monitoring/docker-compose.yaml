@@ -63,15 +63,16 @@ services:
     build:
       context: ./agent
       dockerfile: Dockerfile
-    image: pve-agent:latest
+    image: agent:latest
     container_name: agent
     restart: unless-stopped
     ports:
       - "9999:9999"
+    volumes:
+      - ./agent/prompt.txt:/app/prompt.txt
     env_file:
       - .env
     environment:
-      MCP_URL: "http://pve-mcp:8000/mcp"
       PYTHONUNBUFFERED: 1
     networks:
       - monitor-net  

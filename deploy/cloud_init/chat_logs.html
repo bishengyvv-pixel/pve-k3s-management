@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PVE Agent Live Operations Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <script src="config.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        dark: {
+                            bg: '#0F172A',
+                            surface: '#1E293B',
+                            border: '#334155'
+                        },
+                        brand: {
+                            blue: '#3B82F6',
+                            purple: '#8B5CF6',
+                            green: '#10B981',
+                            red: '#EF4444',
+                            orange: '#F59E0B'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0F172A;
+            color: #E2E8F0;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1E293B;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748B;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        pre {
+            background: #0f172a !important;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #334155;
+            overflow-x: auto;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 0.875rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.active {
+            box-shadow: 0 0 8px currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+    </style>
+</head>
+
+<body
+    class="h-screen flex flex-col overflow-hidden font-sans antialiased text-base selection:bg-brand-blue selection:text-white">
+
+    <!-- Header -->
+    <header
+        class="h-16 border-b border-dark-border bg-dark-surface/80 backdrop-blur flex items-center justify-between px-6 sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div
+                class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-blue to-brand-purple flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-brand-blue/20">
+                M</div>
+            <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">PVE
+                Agent Monitor</h1>
+        </div>
+        <div class="flex items-center gap-4 text-sm">
+            <div id="connectionStatus"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-dark-bg border border-dark-border text-gray-400">
+                <span class="status-dot bg-gray-500"></span>
+                <span>Connecting...</span>
+            </div>
+            <button onclick="clearLogs()"
+                class="px-4 py-1.5 rounded-lg bg-dark-surface hover:bg-white/5 border border-dark-border text-gray-300 transition-colors">
+                Clear Logs
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex gap-6 p-6 overflow-hidden relative">
+        <!-- Background decorative elements -->
+        <div class="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-10">
+            <div class="absolute top-[20%] left-[10%] w-96 h-96 bg-brand-blue/5 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-[20%] right-[10%] w-96 h-96 bg-brand-purple/5 rounded-full blur-3xl"></div>
+        </div>
+
+        <!-- Event Feed -->
+        <div class="flex-1 flex flex-col glass-panel rounded-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-dark-border flex items-center justify-between bg-white/5">
+                <h2 class="font-semibold text-gray-200">Live Event Feed</h2>
+                <span id="eventCount" class="text-xs font-mono text-gray-500 bg-dark-bg px-2 py-1 rounded">0
+                    Events</span>
+            </div>
+            <div id="eventFeed" class="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth">
+                <!-- Events will stream here -->
+                <div class="text-center text-gray-500 py-10 opacity-60">
+                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-700" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <p>Ready to receive live updates</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar / Stats (Optional expansion) -->
+        <div class="w-80 flex flex-col gap-6">
+            <!-- Active Threads Card -->
+            <div class="glass-panel rounded-2xl p-5 h-64 flex flex-col">
+                <h3 class="text-sm uppercase tracking-wider text-gray-500 font-semibold mb-4">Active Threads</h3>
+                <div id="activeThreads" class="flex-1 overflow-y-auto space-y-2">
+                    <div class="text-sm text-gray-600 italic">No active sessions</div>
+                </div>
+            </div>
+
+            <!-- Quick Filter -->
+            <div class="glass-panel rounded-2xl p-5 flex-1 flex flex-col">
+                <h3 class="text-sm uppercase tracking-wider text-gray-500 font-semibold mb-4">Filters</h3>
+                <div class="space-y-2">
+                    <label
+                        class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group">
+                        <input type="checkbox" checked
+                            class="w-4 h-4 rounded border-gray-600 text-brand-blue focus:ring-offset-dark-bg focus:ring-brand-blue bg-dark-bg"
+                            onchange="toggleFilter('thought')">
+                        <span class="w-2 h-2 rounded-full bg-brand-orange"></span>
+                        <span class="text-gray-300 group-hover:text-white">Thoughts</span>
+                    </label>
+                    <label
+                        class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group">
+                        <input type="checkbox" checked
+                            class="w-4 h-4 rounded border-gray-600 text-brand-blue focus:ring-offset-dark-bg focus:ring-brand-blue bg-dark-bg"
+                            onchange="toggleFilter('tool_call')">
+                        <span class="w-2 h-2 rounded-full bg-brand-blue"></span>
+                        <span class="text-gray-300 group-hover:text-white">Tool Calls</span>
+                    </label>
+                    <label
+                        class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group">
+                        <input type="checkbox" checked
+                            class="w-4 h-4 rounded border-gray-600 text-brand-blue focus:ring-offset-dark-bg focus:ring-brand-blue bg-dark-bg"
+                            onchange="toggleFilter('tool_result')">
+                        <span class="w-2 h-2 rounded-full bg-brand-green"></span>
+                        <span class="text-gray-300 group-hover:text-white">Tool Results</span>
+                    </label>
+                    <label
+                        class="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group">
+                        <input type="checkbox" checked
+                            class="w-4 h-4 rounded border-gray-600 text-brand-blue focus:ring-offset-dark-bg focus:ring-brand-blue bg-dark-bg"
+                            onchange="toggleFilter('error')">
+                        <span class="w-2 h-2 rounded-full bg-brand-red"></span>
+                        <span class="text-gray-300 group-hover:text-white">Errors</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const MONITOR_URL = `${BACKEND_BASE_URL}/monitor`;
+        const feed = document.getElementById('eventFeed');
+        const activeThreadsEl = document.getElementById('activeThreads');
+        const countBadge = document.getElementById('eventCount');
+        const connStatus = document.getElementById('connectionStatus');
+
+        let eventCount = 0;
+        let activeThreads = new Set();
+        let filters = {
+            thought: true,
+            tool_call: true,
+            tool_result: true,
+            error: true,
+            start: true,
+            answer: true
+        };
+
+        function updateConnectionStatus(status) {
+            const dot = connStatus.querySelector('.status-dot');
+            const text = connStatus.querySelector('span:last-child');
+
+            connStatus.classList.remove('text-gray-400', 'text-brand-green', 'text-brand-red');
+            dot.className = 'status-dot';
+
+            if (status === 'connected') {
+                connStatus.classList.add('text-brand-green');
+                connStatus.classList.add('bg-brand-green/10');
+                connStatus.classList.add('border-brand-green/20');
+                dot.classList.add('bg-brand-green', 'active');
+                text.innerText = 'Connected';
+            } else if (status === 'disconnected') {
+                connStatus.classList.add('text-brand-red');
+                connStatus.classList.add('bg-brand-red/10');
+                connStatus.classList.add('border-brand-red/20');
+                dot.classList.add('bg-brand-red');
+                text.innerText = 'Disconnected';
+            } else {
+                connStatus.classList.add('text-gray-400');
+                dot.classList.add('bg-gray-500');
+                text.innerText = 'Connecting...';
+            }
+        }
+
+        function clearLogs() {
+            feed.innerHTML = `
+                <div class="text-center text-gray-500 py-10 opacity-60">
+                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                    <p>Logs cleared</p>
+                </div>
+            `;
+            eventCount = 0;
+            countBadge.innerText = '0 Events';
+        }
+
+        function scrollToThread(threadId) {
+            // Find the first event card with this thread ID
+            const targetCard = document.querySelector(`.event-card[data-thread-id="${threadId}"]`);
+
+            if (targetCard) {
+                // Scroll into view
+                targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Add highlight effect
+                document.querySelectorAll('.event-card').forEach(card => card.classList.remove('ring-2', 'ring-brand-blue', 'ring-offset-2', 'ring-offset-dark-bg'));
+                targetCard.classList.add('ring-2', 'ring-brand-blue', 'ring-offset-2', 'ring-offset-dark-bg');
+
+                // Remove highlight after animation
+                setTimeout(() => {
+                    targetCard.classList.remove('ring-2', 'ring-brand-blue', 'ring-offset-2', 'ring-offset-dark-bg');
+                }, 2000);
+            }
+        }
+
+        function toggleFilter(type) {
+            filters[type] = !filters[type];
+            document.querySelectorAll(`.event-card[data-type="${type}"]`).forEach(el => {
+                el.style.display = filters[type] ? 'block' : 'none';
+            });
+        }
+
+        function updateThreadsList(threadId) {
+            if (!activeThreads.has(threadId)) {
+                activeThreads.add(threadId);
+                // Simple rendering of threads
+                activeThreadsEl.innerHTML = Array.from(activeThreads).map(id => `
+                    <div onclick="scrollToThread('${id}')" class="flex items-center gap-2 p-2 rounded bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors group">
+                        <div class="w-2 h-2 rounded-full bg-brand-green active status-dot group-hover:shadow-[0_0_10px_rgba(16,185,129,0.6)] transition-all"></div>
+                        <span class="font-mono text-xs text-brand-blue group-hover:text-brand-purple transition-colors">#${id}</span>
+                        <span class="text-xs text-gray-400 ml-auto group-hover:text-gray-200">Active</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
+        }
+
+        function createEventCard(data) {
+            const typeConfig = {
+                'start': { color: 'text-white', border: 'border-l-4 border-white', icon: '🚀', bg: 'bg-white/5' },
+                'thought': { color: 'text-brand-orange', border: 'border-l-4 border-brand-orange', icon: '🤔', bg: 'bg-brand-orange/5' },
+                'tool_call': { color: 'text-brand-blue', border: 'border-l-4 border-brand-blue', icon: '🛠️', bg: 'bg-brand-blue/5' },
+                'tool_result': { color: 'text-brand-green', border: 'border-l-4 border-brand-green', icon: '✅', bg: 'bg-brand-green/5' },
+                'answer': { color: 'text-brand-purple', border: 'border-l-4 border-brand-purple', icon: '✨', bg: 'bg-brand-purple/10' },
+                'error': { color: 'text-brand-red', border: 'border-l-4 border-brand-red', icon: '❌', bg: 'bg-brand-red/10' }
+            };
+
+            const config = typeConfig[data.type] || { color: 'text-gray-400', border: 'border-l-4 border-gray-500', icon: '📝', bg: 'bg-gray-800' };
+            const timeStr = formatTime(data.timestamp);
+
+            // Format Content
+            let contentHtml = '';
+            if (data.type === 'tool_call') {
+                contentHtml = `
+                    <div class="font-mono text-sm mb-2 text-brand-blue font-bold">${data.name}</div>
+                    <pre class="text-xs text-gray-300 bg-black/30 p-2 rounded border border-white/10 overflow-x-auto">${JSON.stringify(data.args, null, 2)}</pre>
+                `;
+            } else if (data.type === 'tool_result') {
+                // Shorten potentially long result output
+                let content = data.content;
+                const isLong = content.length > 500;
+                contentHtml = `
+                    <div class="font-mono text-sm mb-2 text-brand-green font-bold">${data.name}</div>
+                    <pre class="text-xs text-gray-300 bg-black/30 p-2 rounded border border-white/10 overflow-x-auto ${isLong ? 'max-h-40 cursor-pointer hover:max-h-full transition-all' : ''}" title="${isLong ? 'Click to expand' : ''}">${content}</pre>
+                `;
+            } else if (data.type === 'thought' || data.type === 'answer' || data.type === 'start') {
+                contentHtml = marked.parse(data.content);
+            } else {
+                contentHtml = `<div class="text-gray-300">${data.content}</div>`;
+            }
+
+            const div = document.createElement('div');
+            div.className = `event-card animate-fade-in mb-4 rounded-r-lg ${config.border} bg-dark-surface ${config.bg} p-4 shadow-sm border-t border-r border-b border-dark-border transition-all duration-300`;
+            div.dataset.type = data.type;
+            div.dataset.threadId = data.thread_id;
+            div.style.display = filters[data.type] ? 'block' : 'none';
+
+            div.innerHTML = `
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-lg">${config.icon}</span>
+                        <span class="font-bold uppercase text-xs tracking-wider ${config.color}">${data.type.replace('_', ' ')}</span>
+                        <span class="text-xs text-gray-500 font-mono bg-black/20 px-1.5 py-0.5 rounded">Thread: ${data.thread_id}</span>
+                    </div>
+                    <span class="text-xs font-mono text-gray-500">${timeStr}</span>
+                </div>
+                <div class="prose prose-invert prose-sm max-w-none text-gray-300 leading-relaxed">
+                    ${contentHtml}
+                </div>
+            `;
+
+            return div;
+        }
+
+        function initSSE() {
+            const eventSource = new EventSource(MONITOR_URL);
+
+            eventSource.onopen = () => {
+                console.log("Monitor Connected");
+                updateConnectionStatus('connected');
+                // Clear placeholder if it's the first connection
+                if (eventCount === 0) {
+                    feed.innerHTML = '';
+                }
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+
+                    // Update state
+                    eventCount++;
+                    countBadge.innerText = `${eventCount} Events`;
+                    if (data.thread_id) updateThreadsList(data.thread_id);
+
+                    // Add to visualization
+                    const card = createEventCard(data);
+                    feed.appendChild(card);
+
+                    // Auto scroll if near bottom
+                    const isNearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 100;
+                    if (isNearBottom) {
+                        feed.scrollTop = feed.scrollHeight;
+                    }
+
+                } catch (e) {
+                    console.error("Parse Error", e);
+                }
+            };
+
+            eventSource.onerror = (err) => {
+                console.error("SSE Error", err);
+                updateConnectionStatus('disconnected');
+                eventSource.close();
+
+                // Retry in 3s
+                setTimeout(initSSE, 3000);
+            };
+        }
+
+        // Start
+        initSSE();
+
+    </script>
+</body>
+
+</html>
