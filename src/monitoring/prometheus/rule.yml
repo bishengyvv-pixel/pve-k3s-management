@@ -1,22 +1,24 @@
 groups:
-- name: k3s-node-alerts
+- name: k3s-node-immediate-alerts
   rules:
-  - alert: HighCPULoad
-    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 60
-    for: 1m
+  - alert: HighCPULoad_Immediate
+    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5s])) * 100) > 60
+    for: 0s 
     labels:
       severity: warning
       owner: infrastructure
+      reaction: AutoOperate
     annotations:
-      summary: "节点 CPU 负载过高 (大于 80%)"
-      description: "节点 {{ $labels.instance }} 的平均 CPU 使用率在过去 5 分钟内超过 80% (当前值: {{ $value }}%)"
+      summary: "【瞬时警告】节点 CPU 负载过高 (大于 60%)"
+      description: "节点 {{ $labels.instance }} 的瞬时 CPU 使用率在过去 5 秒内超过 60% (当前值: {{ $value }}%)"
 
-  - alert: TEST_IMMEDIATE_CPU_LOAD
-    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[30s])) * 100) > 90
+  - alert: UltraSensitiveCPULoad_Immediate
+    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[2s])) * 100) > 90
     for: 0s 
     labels:
-      severity: test
+      severity: critical
       owner: test-user
+      reaction: AutoOperate
     annotations:
-      summary: "【立即触发测试】CPU 负载超高 ( > 90%)"
-      description: "节点 {{ $labels.instance }} 的 CPU 瞬时负载已在 30 秒窗口内超过 90% (当前值: {{ $value }}%)"
+      summary: "【极限触发】CPU 负载超高 ( > 90%) - 触发自动运维"
+      description: "节点 {{ $labels.instance }} 的 CPU 瞬时负载已在 2 秒窗口内超过 90% (当前值: {{ $value }}%)"
