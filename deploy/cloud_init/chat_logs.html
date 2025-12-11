@@ -91,6 +91,21 @@
             border-radius: 0.5rem;
             border: 1px solid #334155;
             overflow-x: auto;
+            white-space: pre-wrap;
+            /* 允许自动换行 */
+            word-wrap: break-word;
+            /* 长单词自动换行 */
+        }
+
+        /* 平滑展开/收缩动画 */
+        .collapsible-content {
+            transition: max-height 0.4s ease-in-out, opacity 0.3s ease-in-out;
+            overflow: hidden;
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0 !important;
+            opacity: 0;
         }
 
         code {
@@ -332,35 +347,20 @@
         }
 
         function toggleExpand(id) {
-            const pre = document.getElementById(`content-${id}`);
+            const content = document.getElementById(`content-${id}`);
             const btn = document.getElementById(`btn-${id}`);
-            const icon = btn.querySelector('.icon');
             const text = btn.querySelector('.text');
 
-            if (pre.style.maxHeight === 'none') {
-                // Collapse
-                pre.style.maxHeight = '10rem';
-                icon.style.transform = 'rotate(0deg)';
-                text.innerText = 'Expand';
-                pre.classList.remove('overflow-y-visible');
-                pre.classList.add('overflow-y-hidden');
+            if (content.classList.contains('collapsed')) {
+                // 展开
+                content.style.maxHeight = content.scrollHeight + 'px';
+                content.classList.remove('collapsed');
+                text.innerHTML = '−'; // 使用减号
             } else {
-                // Expand
-                pre.style.maxHeight = 'none'; // Set to none to allow full height
-                // To animate to height auto, we usually need JS to calculate scrollHeight, 
-                // but for simplicity in this replace, we can try a large max-height or just toggle class.
-                // Better Animation approach:
-                // 1. Get current height
-                // 2. Set height to auto, get new height
-                // 3. Animate from current to new.
-                // For this simple implementation, let's just toggle a class that sets max-height to a large value.
-
-                pre.style.maxHeight = pre.scrollHeight + 'px';
-                icon.style.transform = 'rotate(180deg)';
-                text.innerText = 'Collapse';
-
-                // After transition, remove max-height constraint if needed? 
-                // No, keeping it at scrollHeight is fine for static content.
+                // 收缩
+                content.style.maxHeight = '0';
+                content.classList.add('collapsed');
+                text.innerHTML = '+'; // 使用加号
             }
         }
 
@@ -425,21 +425,18 @@
                     }
                 }
 
-                const isLong = content && content.length > 500;
                 const uniqueId = 'tool-' + Math.random().toString(36).substr(2, 9);
 
                 let headerContent = `<div class="font-mono text-sm mb-2 text-brand-green font-bold flex justify-between items-center">
                     <span>${data.name}</span>
-                    ${isLong ? `
-                    <button id="btn-${uniqueId}" onclick="toggleExpand('${uniqueId}')" class="text-xs flex items-center gap-1 text-gray-400 hover:text-white transition-colors focus:outline-none">
-                        <span class="text">Expand</span>
-                        <svg class="icon w-3 h-3 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </button>` : ''}
+                    <button id="btn-${uniqueId}" onclick="toggleExpand('${uniqueId}')" class="text-lg flex items-center justify-center w-6 h-6 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-all focus:outline-none">
+                        <span class="text">+</span>
+                    </button>
                 </div>`;
 
                 contentHtml = `
                     ${headerContent}
-                    <pre id="content-${uniqueId}" class="text-xs text-gray-300 bg-black/30 p-2 rounded border border-white/10 overflow-x-auto transition-all duration-300 ease-in-out" style="${isLong ? 'max-height: 10rem; overflow-y: hidden;' : ''}">${content}</pre>
+                    <pre id="content-${uniqueId}" class="collapsible-content collapsed text-xs text-gray-300 bg-black/30 p-2 rounded border border-white/10 overflow-x-auto" style="max-height: 0;">${content}</pre>
                 `;
             } else if (data.type === 'thought' || data.type === 'answer' || data.type === 'start') {
                 contentHtml = marked.parse(data.content);
