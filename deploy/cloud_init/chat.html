@@ -261,7 +261,7 @@
 
     <script>
         // JavaScript 逻辑
-        const API_URL = `${AGENT_BASE_URL}/chat`; // 使用配置文件中的地址
+        const API_URL = `${BACKEND_BASE_URL}/chat`; // 使用配置文件中的地址
         const messagesDiv = document.getElementById('messages');
         const userInput = document.getElementById('userInput');
         const sendButton = document.getElementById('sendButton');
@@ -440,7 +440,46 @@
                                         break;
 
                                     case 'tool_result':
-                                        const toolResultMarkdown = `\`${payload.name}\`\n\`\`\`json\n${payload.content}\n\`\`\``;
+                                        let toolContent = payload.content;
+
+                                        // 尝试递归格式化内部的 JSON 字符串
+                                        try {
+                                            const parseInnerJson = (obj) => {
+                                                if (typeof obj === 'string') {
+                                                    try {
+                                                        const parsed = JSON.parse(obj);
+                                                        // 只有当解析出对象或数组时才返回解析后的结果，避免将普通字符串误处理
+                                                        if (typeof parsed === 'object' && parsed !== null) {
+                                                            return parseInnerJson(parsed);
+                                                        }
+                                                    } catch (e) {
+                                                        // 忽略非 JSON 字符
+                                                    }
+                                                    return obj;
+                                                } else if (Array.isArray(obj)) {
+                                                    return obj.map(parseInnerJson);
+                                                } else if (typeof obj === 'object' && obj !== null) {
+                                                    const newObj = {};
+                                                    for (const key in obj) {
+                                                        newObj[key] = parseInnerJson(obj[key]);
+                                                    }
+                                                    return newObj;
+                                                }
+                                                return obj;
+                                            };
+
+                                            if (typeof toolContent === 'object') {
+                                                toolContent = parseInnerJson(toolContent);
+                                                toolContent = JSON.stringify(toolContent, null, 2);
+                                            }
+                                        } catch (e) {
+                                            console.warn("Formatting tool content failed:", e);
+                                            if (typeof toolContent === 'object') {
+                                                toolContent = JSON.stringify(toolContent, null, 2);
+                                            }
+                                        }
+
+                                        const toolResultMarkdown = `\`\`\`json\n${toolContent}\n\`\`\``;
                                         addAnalysisItem(analysisContainer, 'tool_result', toolResultMarkdown, `工具结果: ${payload.name}`);
                                         break;
 

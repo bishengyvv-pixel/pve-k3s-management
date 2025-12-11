@@ -232,7 +232,7 @@
     </main>
 
     <script>
-        const MONITOR_URL = `${AGENT_BASE_URL}/monitor`;
+        const MONITOR_URL = `${BACKEND_BASE_URL}/monitor`;
         const feed = document.getElementById('eventFeed');
         const activeThreadsEl = document.getElementById('activeThreads');
         const countBadge = document.getElementById('eventCount');
@@ -331,6 +331,39 @@
             return date.toLocaleTimeString('zh-CN', { hour12: false }) + '.' + date.getMilliseconds().toString().padStart(3, '0');
         }
 
+        function toggleExpand(id) {
+            const pre = document.getElementById(`content-${id}`);
+            const btn = document.getElementById(`btn-${id}`);
+            const icon = btn.querySelector('.icon');
+            const text = btn.querySelector('.text');
+
+            if (pre.style.maxHeight === 'none') {
+                // Collapse
+                pre.style.maxHeight = '10rem';
+                icon.style.transform = 'rotate(0deg)';
+                text.innerText = 'Expand';
+                pre.classList.remove('overflow-y-visible');
+                pre.classList.add('overflow-y-hidden');
+            } else {
+                // Expand
+                pre.style.maxHeight = 'none'; // Set to none to allow full height
+                // To animate to height auto, we usually need JS to calculate scrollHeight, 
+                // but for simplicity in this replace, we can try a large max-height or just toggle class.
+                // Better Animation approach:
+                // 1. Get current height
+                // 2. Set height to auto, get new height
+                // 3. Animate from current to new.
+                // For this simple implementation, let's just toggle a class that sets max-height to a large value.
+
+                pre.style.maxHeight = pre.scrollHeight + 'px';
+                icon.style.transform = 'rotate(180deg)';
+                text.innerText = 'Collapse';
+
+                // After transition, remove max-height constraint if needed? 
+                // No, keeping it at scrollHeight is fine for static content.
+            }
+        }
+
         function createEventCard(data) {
             const typeConfig = {
                 'start': { color: 'text-white', border: 'border-l-4 border-white', icon: '🚀', bg: 'bg-white/5' },
@@ -354,10 +387,59 @@
             } else if (data.type === 'tool_result') {
                 // Shorten potentially long result output
                 let content = data.content;
-                const isLong = content.length > 500;
+
+                // 尝试递归格式化内部的 JSON 字符串
+                try {
+                    const parseInnerJson = (obj) => {
+                        if (typeof obj === 'string') {
+                            try {
+                                const parsed = JSON.parse(obj);
+                                // 只有当解析出对象或数组时才返回解析后的结果，避免将普通字符串误处理
+                                if (typeof parsed === 'object' && parsed !== null) {
+                                    return parseInnerJson(parsed);
+                                }
+                            } catch (e) {
+                                // 忽略非 JSON 字符
+                            }
+                            return obj;
+                        } else if (Array.isArray(obj)) {
+                            return obj.map(parseInnerJson);
+                        } else if (typeof obj === 'object' && obj !== null) {
+                            const newObj = {};
+                            for (const key in obj) {
+                                newObj[key] = parseInnerJson(obj[key]);
+                            }
+                            return newObj;
+                        }
+                        return obj;
+                    };
+
+                    if (typeof content === 'object') {
+                        content = parseInnerJson(content);
+                        content = JSON.stringify(content, null, 2);
+                    }
+                } catch (e) {
+                    console.warn("Formatting tool content failed:", e);
+                    if (typeof content === 'object') {
+                        content = JSON.stringify(content, null, 2);
+                    }
+                }
+
+                const isLong = content && content.length > 500;
+                const uniqueId = 'tool-' + Math.random().toString(36).substr(2, 9);
+
+                let headerContent = `<div class="font-mono text-sm mb-2 text-brand-green font-bold flex justify-between items-center">
+                    <span>${data.name}</span>
+                    ${isLong ? `
+                    <button id="btn-${uniqueId}" onclick="toggleExpand('${uniqueId}')" class="text-xs flex items-center gap-1 text-gray-400 hover:text-white transition-colors focus:outline-none">
+                        <span class="text">Expand</span>
+                        <svg class="icon w-3 h-3 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>` : ''}
+                </div>`;
+
                 contentHtml = `
-                    <div class="font-mono text-sm mb-2 text-brand-green font-bold">${data.name}</div>
-                    <pre class="text-xs text-gray-300 bg-black/30 p-2 rounded border border-white/10 overflow-x-auto ${isLong ? 'max-h-40 cursor-pointer hover:max-h-full transition-all' : ''}" title="${isLong ? 'Click to expand' : ''}">${content}</pre>
+                    ${headerContent}
+                    <pre id="content-${uniqueId}" class="text-xs text-gray-300 bg-black/30 p-2 rounded border border-white/10 overflow-x-auto transition-all duration-300 ease-in-out" style="${isLong ? 'max-height: 10rem; overflow-y: hidden;' : ''}">${content}</pre>
                 `;
             } else if (data.type === 'thought' || data.type === 'answer' || data.type === 'start') {
                 contentHtml = marked.parse(data.content);
