@@ -45,6 +45,11 @@ mirrors:
     endpoint:
       - "${REGISTRY_ENDPOINT}"
       - "http://k3m6f90oiarhbg.xuanyuan.run"
+  "${MANAGER_IP}:5000":
+    endpoint:
+      - "${REGISTRY_ENDPOINT}"
+    insecure: true
+
 EOF
 
     if [ $? -ne 0 ]; then
