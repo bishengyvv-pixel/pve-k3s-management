@@ -19,7 +19,7 @@ packages:
 runcmd:
   - systemctl enable --now qemu-guest-agent
   - |
-    export MANAGER_IP="192.168.10.200" 
+    export MANAGER_IP="192.168.10.100" 
     wget http://${MANAGER_IP}:8080/init.sh
     chmod +x init.sh
     bash init.sh work_node
